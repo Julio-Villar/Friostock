@@ -1118,26 +1118,26 @@ async function enviarDetalleVentaWA(id){
     if(!v){showToast('⚠️ Venta no encontrada');return;}
     const detalles=await GET('detalle_venta',`?venta_id=eq.${id}`);
     const cfg=cache.config||{};
-    const negocio=cfg.nombre_negocio||'FríoStock';
+    const negocio=cfg.nombre_negocio||'FrioStock';
     const estado=v.estado||'por_entregar';
     const fd=new Date(v.fecha).toLocaleDateString('es-CL');
-    let msg=`🧊 *${negocio}*\n`;
-    msg+=`━━━━━━━━━━━━━━━━━━\n`;
-    msg+=`📋 *Detalle de tu pedido*\n\n`;
+    let msg='';
+    msg+=`*${negocio}*\n`;
+    msg+=`--------------------\n`;
+    msg+=`*Detalle de tu pedido*\n\n`;
     detalles.forEach(d=>{
-      msg+=`• ${d.producto_nombre}\n`;
-      msg+=`  ${d.cantidad} × ${fmt(d.precio)} = *${fmt(d.subtotal)}*\n`;
+      msg+=`- ${d.producto_nombre}\n`;
+      msg+=`  ${d.cantidad} x ${fmt(d.precio)} = *${fmt(d.subtotal)}*\n`;
     });
-    msg+=`━━━━━━━━━━━━━━━━━━\n`;
-    if((v.descuento||0)>0) msg+=`💸 Descuento: -${fmt(v.descuento)}\n`;
-    msg+=`💰 *TOTAL: ${fmt(v.total)}*\n`;
-    if(v.tipo_pago==='credito'&&(v.pendiente||0)>0) msg+=`⚠️ *Pendiente: ${fmt(v.pendiente)}*\n`;
-    msg+=`\n💳 Pago: ${v.tipo_pago}`;
-    msg+=`\n📦 Estado: ${estado==='entregado'?'✅ Entregado':'🚚 Por entregar'}`;
-    msg+=`\n📅 Fecha: ${fd}`;
-    if(v.observacion) msg+=`\n📝 ${v.observacion}`;
-    msg+=`\n\n¡Gracias por tu compra! 🙏`;
-    // Buscar teléfono del cliente
+    msg+=`--------------------\n`;
+    if((v.descuento||0)>0) msg+=`Descuento: -${fmt(v.descuento)}\n`;
+    msg+=`*TOTAL: ${fmt(v.total)}*\n`;
+    if(v.tipo_pago==='credito'&&(v.pendiente||0)>0) msg+=`*Pendiente: ${fmt(v.pendiente)}*\n`;
+    msg+=`\nPago: ${v.tipo_pago}`;
+    msg+=`\nEstado: ${estado==='entregado'?'Entregado':'Por entregar'}`;
+    msg+=`\nFecha: ${fd}`;
+    if(v.observacion) msg+=`\nNota: ${v.observacion}`;
+    msg+=`\n\nGracias por tu compra!`;
     let tel='';
     if(v.cliente_id){
       const cli=cache.clientes.find(c=>c.id===v.cliente_id);
