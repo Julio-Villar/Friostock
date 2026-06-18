@@ -93,6 +93,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .badge-info{background:#cce5ff;color:#004085;}
 .badge-credit{background:#e2d9f3;color:#3d0a91;}
 .badge-trans{background:#d1ecf1;color:#0c5460;}
+.badge-entregado{background:#d4edda;color:#155724;}
+.badge-por-entregar{background:#fff3cd;color:#856404;}
 
 /* LIST ITEMS */
 .list-item{display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);gap:11px;}
@@ -528,6 +530,13 @@ select option{background:#fff;color:var(--text);}
       <div class="form-group"><label class="form-label">Fecha de pago acordada</label><input type="date" id="ev-fecha-pago"></div>
     </div>
     <div class="form-group"><label class="form-label">Descuento ($)</label><input type="number" id="ev-descuento" placeholder="0" min="0"></div>
+    <div class="form-group">
+      <label class="form-label">Estado de entrega</label>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" id="ev-por_entregar" style="flex:1;" onclick="selectEstado('por_entregar')">🚚 Por entregar</button>
+        <button class="btn btn-sm" id="ev-entregado" style="flex:1;" onclick="selectEstado('entregado')">✅ Entregado</button>
+      </div>
+    </div>
     <div class="form-group"><label class="form-label">Observaciones</label><input type="text" id="ev-obs" placeholder="Notas..."></div>
     <div style="display:flex;gap:8px;margin-top:4px;">
       <button class="btn btn-ghost" style="flex:1;" onclick="closeModal('modal-editar-venta')">Cancelar</button>
@@ -846,18 +855,31 @@ function renderVentas(){
   if(!vs.length){document.getElementById('ventas-list').innerHTML='<div class="empty"><div class="emoji">💰</div><p>Sin ventas en este período</p></div>';return;}
   document.getElementById('ventas-list').innerHTML=vs.map(v=>{
     const tc=v.tipo_pago==='contado'?'badge-success':v.tipo_pago==='transferencia'?'badge-trans':'badge-credit';
+    const estado=v.estado||'por_entregar';
+    const estadoBadge=estado==='entregado'
+      ?'<span class="badge badge-entregado">✅ Entregado</span>'
+      :'<span class="badge badge-por-entregar">🚚 Por entregar</span>';
     const fd=new Date(v.fecha);
-    return `<div class="venta-card">
+    return `<div class="venta-card" style="border-left:3px solid ${estado==='entregado'?'var(--success)':'var(--warning)'};">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;">
-        <div><div style="font-weight:600;font-size:14px;">${v.cliente_nombre||'Consumidor final'}</div><div style="font-size:11px;color:var(--text3);">${fd.toLocaleDateString('es-CL')} ${fd.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</div></div>
-        <div style="text-align:right;"><div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--primary);">${fmt(v.total)}</div><span class="badge ${tc}">${v.tipo_pago}</span></div>
+        <div>
+          <div style="font-weight:600;font-size:14px;">${v.cliente_nombre||'Consumidor final'}</div>
+          <div style="font-size:11px;color:var(--text3);">${fd.toLocaleDateString('es-CL')} ${fd.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--primary);">${fmt(v.total)}</div>
+          <span class="badge ${tc}">${v.tipo_pago}</span>
+        </div>
       </div>
+      <div style="margin-bottom:6px;">${estadoBadge}</div>
       ${v.descuento>0?`<div style="font-size:12px;color:var(--success);">Descuento: ${fmt(v.descuento)}</div>`:''}
       ${v.tipo_pago==='credito'&&(v.pendiente||0)>0?`<div style="font-size:12px;color:var(--warning);margin-top:4px;">⚠️ Pendiente: ${fmt(v.pendiente)}</div>`:''}
       ${v.observacion?`<div style="font-size:12px;color:var(--text3);margin-top:3px;">📝 ${v.observacion}</div>`:''}
-      <div style="display:flex;gap:6px;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+      <div style="display:flex;gap:6px;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;flex-wrap:wrap;">
         <button class="btn btn-ghost btn-xs" onclick="verDetalleVenta('${v.id}')">👁️ Ver</button>
         <button class="btn btn-ghost btn-xs" onclick="openEditarVenta('${v.id}')">✏️ Editar</button>
+        <button class="btn ${estado==='entregado'?'btn-ghost':'btn-success'} btn-xs" onclick="toggleEstado('${v.id}','${estado}')">${estado==='entregado'?'↩️ Marcar pendiente':'✅ Marcar entregado'}</button>
+        <button class="btn btn-wa btn-xs" onclick="enviarDetalleVentaWA('${v.id}')">📱 WA</button>
         <button class="btn btn-danger btn-xs" onclick="eliminarVenta('${v.id}')">🗑️</button>
       </div>
     </div>`;
@@ -1006,9 +1028,13 @@ async function verDetalleVenta(id){
       if((v.pendiente||0)>0) html+=`<div style="margin-top:8px;font-size:14px;font-weight:600;color:var(--warning);">⚠️ Pendiente: ${fmt(v.pendiente)}</div>`;
     }
     if(v.observacion) html+=`<div style="margin-top:10px;font-size:13px;color:var(--text3);">📝 ${v.observacion}</div>`;
+    const estado=v.estado||'por_entregar';
+    html+=`<div style="margin-top:10px;">${estado==='entregado'?'<span class="badge badge-entregado">✅ Entregado</span>':'<span class="badge badge-por-entregar">🚚 Por entregar</span>'}</div>`;
     // Reusar modal cli-detalle
     document.getElementById('cli-detalle-content').innerHTML=html;
-    document.getElementById('cli-detalle-btns').innerHTML=`<button class="btn btn-ghost btn-block" onclick="closeModal('modal-cli-detalle')">Cerrar</button>`;
+    document.getElementById('cli-detalle-btns').innerHTML=`
+      <button class="btn btn-ghost" style="flex:1;" onclick="closeModal('modal-cli-detalle')">Cerrar</button>
+      <button class="btn btn-wa" style="flex:1;" onclick="closeModal('modal-cli-detalle');enviarDetalleVentaWA('${id}')">📱 Enviar WA</button>`;
     openModal('modal-cli-detalle');
   } catch(e){ showToast('❌ '+e.message); }
 }
@@ -1021,13 +1047,14 @@ function openEditarVenta(id){
   if(!v)return;
   editVentaData=v;
   editTipoPago=v.tipo_pago;
+  editEstado=v.estado||'por_entregar';
   document.getElementById('ev-info').innerHTML=`
     <strong>${v.cliente_nombre||'Consumidor final'}</strong> · ${new Date(v.fecha).toLocaleDateString('es-CL')}<br>
     Total: <strong>${fmt(v.total)}</strong> · Pendiente: <strong>${fmt(v.pendiente||0)}</strong>`;
   selectEditPago(v.tipo_pago);
+  selectEstado(editEstado);
   document.getElementById('ev-descuento').value=v.descuento||0;
   document.getElementById('ev-obs').value=v.observacion||'';
-  // Extraer fecha si está en observacion
   const match=(v.observacion||'').match(/Pago acordado: (\d{4}-\d{2}-\d{2})/);
   document.getElementById('ev-fecha-pago').value=match?match[1]:'';
   openModal('modal-editar-venta');
@@ -1041,6 +1068,17 @@ function selectEditPago(tipo){
   });
   document.getElementById('ev-fecha-box').style.display=tipo==='credito'?'block':'none';
 }
+
+let editEstado='por_entregar';
+function selectEstado(est){
+  editEstado=est;
+  ['por_entregar','entregado'].forEach(e=>{
+    const b=document.getElementById('ev-'+e);
+    if(!b)return;
+    b.className='btn btn-sm '+(e===est?(est==='entregado'?'btn-success':'btn-warning'):'btn-ghost');
+    b.style.flex='1';
+  });
+}
 async function guardarEditarVenta(){
   const v=editVentaData; if(!v)return;
   const desc=parseFloat(document.getElementById('ev-descuento').value)||0;
@@ -1048,20 +1086,68 @@ async function guardarEditarVenta(){
   const fechaPago=document.getElementById('ev-fecha-pago').value;
   let obs=document.getElementById('ev-obs').value.replace(/\s*\|?\s*Pago acordado: \d{4}-\d{2}-\d{2}/,'').trim();
   if(fechaPago) obs=(obs?obs+' | ':'')+'Pago acordado: '+fechaPago;
-  // Calcular nuevo pendiente
   let pendiente=v.pendiente||0;
   if(editTipoPago!=='credito') pendiente=0;
   else if(v.tipo_pago!=='credito') pendiente=nuevoTotal;
   else { const pagado=(v.total||0)-(v.pendiente||0); pendiente=Math.max(0,nuevoTotal-pagado); }
   setBtn('btn-guardar-ev',true,'Guardando...');
   try {
-    await PATCH('ventas',{tipo_pago:editTipoPago,descuento:desc,total:nuevoTotal,pendiente,observacion:obs||null},`?id=eq.${v.id}`);
+    await PATCH('ventas',{tipo_pago:editTipoPago,descuento:desc,total:nuevoTotal,pendiente,observacion:obs||null,estado:editEstado},`?id=eq.${v.id}`);
     showToast('✅ Venta actualizada');
     closeModal('modal-editar-venta');
     await loadVentas(ventasFilter); renderInicio();
     if(document.getElementById('view-creditos').classList.contains('active')) loadCreditos();
   } catch(e){ showToast('❌ '+e.message); }
   finally{ setBtn('btn-guardar-ev',false,'💾 Guardar cambios'); }
+}
+
+async function toggleEstado(id, estadoActual){
+  const nuevoEstado = estadoActual==='entregado' ? 'por_entregar' : 'entregado';
+  try {
+    await PATCH('ventas',{estado:nuevoEstado},`?id=eq.${id}`);
+    const v=ventasCache.find(x=>x.id===id);
+    if(v) v.estado=nuevoEstado;
+    renderVentas();
+    showToast(nuevoEstado==='entregado'?'✅ Marcado como entregado':'🚚 Marcado como por entregar');
+  } catch(e){ showToast('❌ '+e.message); }
+}
+
+async function enviarDetalleVentaWA(id){
+  try {
+    const v=ventasCache.find(x=>x.id===id);
+    if(!v){showToast('⚠️ Venta no encontrada');return;}
+    const detalles=await GET('detalle_venta',`?venta_id=eq.${id}`);
+    const cfg=cache.config||{};
+    const negocio=cfg.nombre_negocio||'FríoStock';
+    const estado=v.estado||'por_entregar';
+    const fd=new Date(v.fecha).toLocaleDateString('es-CL');
+    let msg=`🧊 *${negocio}*\n`;
+    msg+=`━━━━━━━━━━━━━━━━━━\n`;
+    msg+=`📋 *Detalle de tu pedido*\n\n`;
+    detalles.forEach(d=>{
+      msg+=`• ${d.producto_nombre}\n`;
+      msg+=`  ${d.cantidad} × ${fmt(d.precio)} = *${fmt(d.subtotal)}*\n`;
+    });
+    msg+=`━━━━━━━━━━━━━━━━━━\n`;
+    if((v.descuento||0)>0) msg+=`💸 Descuento: -${fmt(v.descuento)}\n`;
+    msg+=`💰 *TOTAL: ${fmt(v.total)}*\n`;
+    if(v.tipo_pago==='credito'&&(v.pendiente||0)>0) msg+=`⚠️ *Pendiente: ${fmt(v.pendiente)}*\n`;
+    msg+=`\n💳 Pago: ${v.tipo_pago}`;
+    msg+=`\n📦 Estado: ${estado==='entregado'?'✅ Entregado':'🚚 Por entregar'}`;
+    msg+=`\n📅 Fecha: ${fd}`;
+    if(v.observacion) msg+=`\n📝 ${v.observacion}`;
+    msg+=`\n\n¡Gracias por tu compra! 🙏`;
+    // Buscar teléfono del cliente
+    let tel='';
+    if(v.cliente_id){
+      const cli=cache.clientes.find(c=>c.id===v.cliente_id);
+      if(cli?.telefono) tel=cli.telefono.replace(/\D/g,'');
+    }
+    const url=tel
+      ?`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`
+      :`https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url,'_blank');
+  } catch(e){ showToast('❌ '+e.message); }
 }
 async function eliminarVenta(id){
   if(!confirm('¿Eliminar esta venta? El stock no se restaurará.'))return;
